@@ -61,7 +61,7 @@ from gramps.gen.errors import WindowActiveError
 from gramps.gen.mime import get_type, is_valid_type
 from ...ddtargets import DdTargets
 from .buttontab import ButtonTab
-from ..addmedia import copy_media_file_to_tree
+from ..addmedia import copy_media_file_to_tree, MediaImportCancelledError
 from gramps.gen.const import THUMBSCALE
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
@@ -645,8 +645,11 @@ class GalleryTab(ButtonTab, DbGUIElement):
                                     self.media_category,
                                     parent=self.uistate.window,
                                     prompt_reuse_existing=True,
+                                    prompt_transfer_action=True,
                                 )
                                 checksum_path = media_path_full(self.dbstate.db, name)
+                            except MediaImportCancelledError:
+                                continue
                             except OSError as err:
                                 from ...dialog import WarningDialog
 

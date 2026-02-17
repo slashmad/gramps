@@ -58,7 +58,10 @@ from gramps.gen.mime import get_type, is_valid_type
 from gramps.gen.lib import Media
 from gramps.gen.db import DbTxn
 from gramps.gui.editors import EditMedia
-from gramps.gui.editors.addmedia import copy_media_file_to_tree
+from gramps.gui.editors.addmedia import (
+    copy_media_file_to_tree,
+    MediaImportCancelledError,
+)
 from gramps.gen.errors import WindowActiveError
 from gramps.gui.filters.sidebar import MediaSidebarFilter
 from gramps.gui.merge import MergeMedia
@@ -262,7 +265,10 @@ class MediaView(ListView):
                         media_category=media_category,
                         parent=self.uistate.window,
                         prompt_reuse_existing=True,
+                        prompt_transfer_action=True,
                     )
+                except MediaImportCancelledError:
+                    continue
                 except OSError as err:
                     WarningDialog(
                         _("Cannot import media file"),

@@ -64,7 +64,7 @@ from gramps.gen.mime import get_type
 from gramps.gen.utils.thumbnails import get_thumbnail_image
 from ..display import display_help
 from ..managedwindow import ManagedWindow
-from ..dialog import ErrorDialog, WarningDialog, QuestionDialog2
+from ..dialog import ErrorDialog, WarningDialog, QuestionDialog2, QuestionDialog3
 from ..glade import Glade
 from gramps.gen.const import URL_MANUAL_SECT2
 
@@ -85,6 +85,10 @@ MEDIA_CATEGORY_TO_SUBDIR = {
     "source": "sources",
     "citation": "citations",
 }
+
+
+class MediaImportCancelledError(Exception):
+    """Raised when the user cancels media import."""
 
 
 def _next_available_filename(directory, filename):
@@ -128,6 +132,35 @@ def _ask_use_existing(existing_abs, source_abs, parent=None):
     return dialog.run()
 
 
+def _ask_copy_or_move(source_abs, target_dir, parent=None):
+    dialog = QuestionDialog3(
+        _("How should this media file be imported?"),
+        _(
+            "Selected file: %s\n\nDestination folder: %s\n\n"
+            "Copy keeps the original file in place. Move relocates it."
+        )
+        % (source_abs, target_dir),
+        _("_Copy"),
+        _("_Move"),
+        parent=parent,
+    )
+    response = dialog.run()
+    if response == -1:
+        return None
+    if response:
+        return "copy"
+    return "move"
+
+
+def _remove_source_if_needed(source_abs, target_abs, transfer_mode):
+    if transfer_mode != "move":
+        return
+    if source_abs == target_abs:
+        return
+    if os.path.exists(source_abs):
+        os.remove(source_abs)
+
+
 def media_category_to_subdir(media_category):
     if not media_category:
         return None
@@ -140,6 +173,7 @@ def copy_media_file_to_tree(
     media_category=None,
     parent=None,
     prompt_reuse_existing=False,
+    prompt_transfer_action=False,
 ):
     """
     Copy media file into the family tree media base path and return the
@@ -161,14 +195,22 @@ def copy_media_file_to_tree(
 
     source_abs = os.path.abspath(source_path)
     target_abs = os.path.abspath(os.path.join(target_dir, os.path.basename(source_abs)))
+    transfer_mode = "copy"
+
+    if prompt_transfer_action:
+        transfer_mode = _ask_copy_or_move(source_abs, target_dir, parent)
+        if transfer_mode is None:
+            raise MediaImportCancelledError()
 
     if source_abs != target_abs:
         if os.path.exists(target_abs):
             if filecmp.cmp(source_abs, target_abs, shallow=False):
+                _remove_source_if_needed(source_abs, target_abs, transfer_mode)
                 return relative_path(target_abs, base_dir)
             if prompt_reuse_existing and _ask_use_existing(
                 target_abs, source_abs, parent
             ):
+                _remove_source_if_needed(source_abs, target_abs, transfer_mode)
                 return relative_path(target_abs, base_dir)
             target_abs = os.path.join(
                 target_dir,
@@ -177,8 +219,12 @@ def copy_media_file_to_tree(
         elif prompt_reuse_existing:
             duplicate_abs = _find_duplicate_by_checksum(base_dir, source_abs)
             if duplicate_abs and _ask_use_existing(duplicate_abs, source_abs, parent):
+                _remove_source_if_needed(source_abs, duplicate_abs, transfer_mode)
                 return relative_path(duplicate_abs, base_dir)
-        shutil.copy2(source_abs, target_abs)
+        if transfer_mode == "move":
+            shutil.move(source_abs, target_abs)
+        else:
+            shutil.copy2(source_abs, target_abs)
 
     return relative_path(target_abs, base_dir)
 
@@ -297,7 +343,10 @@ class AddMedia(ManagedWindow):
                     self.media_category,
                     parent=self.window,
                     prompt_reuse_existing=True,
+                    prompt_transfer_action=True,
                 )
+            except MediaImportCancelledError:
+                return
             except OSError as err:
                 msgstr = _("Cannot import %s")
                 msgstr2 = _("Unable to copy media file to the media path: %s")

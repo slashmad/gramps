@@ -4,11 +4,13 @@
 > This fork currently includes targeted desktop patches:
 > - **Media auto-copy by object type**: when adding media from editors/galleries, selected files are copied into the configured base media path and organized into subfolders: `persons`, `families`, `events`, `places`, `sources`, `citations`.
 > - **Media reuse prompt**: when importing a file and an identical file already exists in the media tree, the UI asks whether to reuse the existing file instead of copying a duplicate.
+> - **Media copy/move prompt**: when importing media into the tree, the UI asks whether to copy (keep original) or move (relocate original) the file.
 > - **Media view drag-and-drop hardening**: dropping files in the Media category now copies into the configured media base path (instead of only keeping an external path), with a destination category selector and optional prompt to open the media editor for linking.
 >
 > Why:
 > - Avoid external-path references (for example Downloads) and keep media libraries self-contained.
 > - Reduce duplicate media files while still allowing shared reuse across references.
+> - Let users choose whether imported files should be retained in original location or moved into the managed media tree.
 
 [The Gramps Project](https://gramps-project.org)
 ===================

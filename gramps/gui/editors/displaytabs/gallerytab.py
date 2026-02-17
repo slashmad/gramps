@@ -640,7 +640,11 @@ class GalleryTab(ButtonTab, DbGUIElement):
                         if self.auto_copy_media:
                             try:
                                 name = copy_media_file_to_tree(
-                                    self.dbstate.db, name, self.media_category
+                                    self.dbstate.db,
+                                    name,
+                                    self.media_category,
+                                    parent=self.uistate.window,
+                                    prompt_reuse_existing=True,
                                 )
                                 checksum_path = media_path_full(self.dbstate.db, name)
                             except OSError as err:

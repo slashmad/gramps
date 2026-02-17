@@ -53,12 +53,18 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 _ = glocale.translation.sgettext
 from gramps.gen.const import ICON, THUMBSCALE, USER_HOME
 from gramps.gen.config import config
-from gramps.gen.utils.file import media_path_full, media_path, relative_path, find_file
+from gramps.gen.utils.file import (
+    media_path_full,
+    media_path,
+    relative_path,
+    find_file,
+    create_checksum,
+)
 from gramps.gen.mime import get_type
 from gramps.gen.utils.thumbnails import get_thumbnail_image
 from ..display import display_help
 from ..managedwindow import ManagedWindow
-from ..dialog import ErrorDialog, WarningDialog
+from ..dialog import ErrorDialog, WarningDialog, QuestionDialog2
 from ..glade import Glade
 from gramps.gen.const import URL_MANUAL_SECT2
 
@@ -91,13 +97,50 @@ def _next_available_filename(directory, filename):
     return candidate
 
 
+def _find_duplicate_by_checksum(search_root, source_abs):
+    source_checksum = create_checksum(source_abs)
+    if not source_checksum:
+        return None
+
+    for root, _, files in os.walk(search_root):
+        for filename in files:
+            candidate_abs = os.path.abspath(os.path.join(root, filename))
+            if candidate_abs == source_abs:
+                continue
+            if create_checksum(candidate_abs) == source_checksum:
+                return candidate_abs
+
+    return None
+
+
+def _ask_use_existing(existing_abs, source_abs, parent=None):
+    dialog = QuestionDialog2(
+        _("A matching media file already exists."),
+        _(
+            "Existing file: %s\n\nSelected file: %s\n\n"
+            "Use the existing file instead of copying a new one?"
+        )
+        % (existing_abs, source_abs),
+        _("_Use existing"),
+        _("_Copy new"),
+        parent=parent,
+    )
+    return dialog.run()
+
+
 def media_category_to_subdir(media_category):
     if not media_category:
         return None
     return MEDIA_CATEGORY_TO_SUBDIR.get(media_category.lower())
 
 
-def copy_media_file_to_tree(db, source_path, media_category=None):
+def copy_media_file_to_tree(
+    db,
+    source_path,
+    media_category=None,
+    parent=None,
+    prompt_reuse_existing=False,
+):
     """
     Copy media file into the family tree media base path and return the
     path relative to the base path.
@@ -123,10 +166,18 @@ def copy_media_file_to_tree(db, source_path, media_category=None):
         if os.path.exists(target_abs):
             if filecmp.cmp(source_abs, target_abs, shallow=False):
                 return relative_path(target_abs, base_dir)
+            if prompt_reuse_existing and _ask_use_existing(
+                target_abs, source_abs, parent
+            ):
+                return relative_path(target_abs, base_dir)
             target_abs = os.path.join(
                 target_dir,
                 _next_available_filename(target_dir, os.path.basename(source_abs)),
             )
+        elif prompt_reuse_existing:
+            duplicate_abs = _find_duplicate_by_checksum(base_dir, source_abs)
+            if duplicate_abs and _ask_use_existing(duplicate_abs, source_abs, parent):
+                return relative_path(duplicate_abs, base_dir)
         shutil.copy2(source_abs, target_abs)
 
     return relative_path(target_abs, base_dir)
@@ -241,7 +292,11 @@ class AddMedia(ManagedWindow):
         if self.auto_copy:
             try:
                 filename = copy_media_file_to_tree(
-                    self.dbase, full_file, self.media_category
+                    self.dbase,
+                    full_file,
+                    self.media_category,
+                    parent=self.window,
+                    prompt_reuse_existing=True,
                 )
             except OSError as err:
                 msgstr = _("Cannot import %s")

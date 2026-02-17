@@ -52,22 +52,18 @@ from gramps.gui.utils import open_file_with_default_application
 from gramps.gui.views.listview import ListView, TEXT, MARKUP, ICON
 from gramps.gui.views.treemodels import MediaModel
 from gramps.gen.config import config
-from gramps.gen.utils.file import (
-    media_path,
-    relative_path,
-    media_path_full,
-    create_checksum,
-)
+from gramps.gen.utils.file import media_path_full, create_checksum
 from gramps.gui.views.bookmarks import MediaBookmarks
 from gramps.gen.mime import get_type, is_valid_type
 from gramps.gen.lib import Media
 from gramps.gen.db import DbTxn
 from gramps.gui.editors import EditMedia
+from gramps.gui.editors.addmedia import copy_media_file_to_tree
 from gramps.gen.errors import WindowActiveError
 from gramps.gui.filters.sidebar import MediaSidebarFilter
 from gramps.gui.merge import MergeMedia
 from gramps.gui.ddtargets import DdTargets
-from gramps.gui.dialog import ErrorDialog
+from gramps.gui.dialog import ErrorDialog, WarningDialog, QuestionDialog2
 from gramps.gen.plug import CATEGORY_QR_MEDIA
 
 
@@ -178,6 +174,59 @@ class MediaView(ListView):
         """
         return self.model.indexlist[obj]
 
+    def _prompt_media_category(self):
+        dialog = Gtk.Dialog(
+            title=_("Select media destination"),
+            transient_for=self.uistate.window,
+            flags=Gtk.DialogFlags.MODAL,
+        )
+        dialog.add_button(_("_Cancel"), Gtk.ResponseType.CANCEL)
+        dialog.add_button(_("_OK"), Gtk.ResponseType.OK)
+
+        content = dialog.get_content_area()
+        content.set_spacing(8)
+
+        label = Gtk.Label(
+            label=_("Store dropped media in this media subfolder:"),
+            xalign=0,
+        )
+        combo = Gtk.ComboBoxText()
+        combo.append("none", _("General (/media)"))
+        combo.append("person", _("Persons"))
+        combo.append("family", _("Families"))
+        combo.append("event", _("Events"))
+        combo.append("place", _("Places"))
+        combo.append("source", _("Sources"))
+        combo.append("citation", _("Citations"))
+        combo.set_active_id("none")
+
+        content.add(label)
+        content.add(combo)
+        dialog.show_all()
+
+        response = dialog.run()
+        media_category = combo.get_active_id()
+        dialog.destroy()
+
+        if response != Gtk.ResponseType.OK:
+            return False, None
+        if media_category == "none":
+            return True, None
+        return True, media_category
+
+    def _prompt_open_link_editor(self):
+        dialog = QuestionDialog2(
+            _("Link imported media now?"),
+            _(
+                "Open the media editor now to link the imported file to a person, "
+                "family, event, place, source, or citation."
+            ),
+            _("_Open editor"),
+            _("_Later"),
+            parent=self.uistate.window,
+        )
+        return dialog.run()
+
     def drag_data_received(self, widget, context, x, y, sel_data, info, time):
         """
         Handle the standard gtk interface for drag_data_received.
@@ -192,6 +241,12 @@ class MediaView(ListView):
 
         files = sel_data.get_uris()
         photo = None
+        imported_handles = []
+
+        ok, media_category = self._prompt_media_category()
+        if not ok:
+            widget.emit_stop_by_name("drag_data_received")
+            return
 
         for file in files:
             protocol, site, mfile, j, k, l = urlparse(file)
@@ -199,14 +254,29 @@ class MediaView(ListView):
                 name = url2pathname(mfile)
                 mime = get_type(name)
                 if not is_valid_type(mime):
-                    return
+                    continue
+                try:
+                    name = copy_media_file_to_tree(
+                        self.dbstate.db,
+                        name,
+                        media_category=media_category,
+                        parent=self.uistate.window,
+                        prompt_reuse_existing=True,
+                    )
+                except OSError as err:
+                    WarningDialog(
+                        _("Cannot import media file"),
+                        _("Unable to copy media file to the media path: %s") % err,
+                        parent=self.uistate.window,
+                    )
+                    continue
+
                 photo = Media()
                 self.uistate.set_busy_cursor(True)
-                photo.set_checksum(create_checksum(name))
+                photo.set_checksum(
+                    create_checksum(media_path_full(self.dbstate.db, name))
+                )
                 self.uistate.set_busy_cursor(False)
-                base_dir = str(media_path(self.dbstate.db))
-                if os.path.exists(base_dir):
-                    name = relative_path(name, base_dir)
                 photo.set_path(name)
                 photo.set_mime_type(mime)
                 basename = os.path.basename(name)
@@ -214,9 +284,17 @@ class MediaView(ListView):
                 photo.set_description(root)
                 with DbTxn(_("Drag Media Object"), self.dbstate.db) as trans:
                     self.dbstate.db.add_media(photo, trans)
+                imported_handles.append(photo.handle)
 
         if photo:
             self.uistate.set_active(photo.handle, "Media")
+            if self._prompt_open_link_editor():
+                object_ = self.dbstate.db.get_media_from_handle(imported_handles[-1])
+                if object_:
+                    try:
+                        EditMedia(self.dbstate, self.uistate, [], object_)
+                    except WindowActiveError:
+                        pass
 
         widget.emit_stop_by_name("drag_data_received")
 

@@ -1,3 +1,14 @@
+> [!IMPORTANT]
+> **Local Patch Block (2026-02-17)**
+>
+> This fork currently includes targeted desktop patches:
+> - **Media auto-copy by object type**: when adding media from editors/galleries, selected files are copied into the configured base media path and organized into subfolders: `persons`, `families`, `events`, `places`, `sources`, `citations`.
+> - **Custom side-by-side build identity**: local build version is set to `6.0.6+slashmad.0.1` and GTK application ID changed to `org.gramps_project.GrampsSlashmad` so the patched build can run next to standard Gramps installs.
+>
+> Why:
+> - Avoid external-path references (for example Downloads) and keep media libraries self-contained.
+> - Allow testing patched desktop builds without replacing the existing Flatpak/system Gramps install.
+
 [The Gramps Project](https://gramps-project.org)
 ===================
 [![GitHub CI](https://github.com/gramps-project/gramps/actions/workflows/gramps-ci.yml/badge.svg?event=push&branch=maintenance/gramps60)](https://github.com/gramps-project/gramps/actions/workflows/gramps-ci.yml?query=branch%3Amaintenance/gramps60)

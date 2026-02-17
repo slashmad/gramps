@@ -1,19 +1,25 @@
 > [!IMPORTANT]
-> **Local Patch Block (2026-02-17)**
+> **Slashmad Fork Patch Block (updated 2026-02-17)**
 >
-> This fork currently includes targeted desktop patches:
-> - **Media auto-copy by object type**: when adding media from editors/galleries, selected files are copied into the configured base media path and organized into subfolders: `persons`, `families`, `events`, `places`, `sources`, `citations`.
-> - **Media reuse prompt**: when importing a file and an identical file already exists in the media tree, the UI asks whether to reuse the existing file instead of copying a duplicate.
-> - **Media copy/move prompt**: when importing media into the tree, the UI asks whether to copy (keep original) or move (relocate original) the file.
-> - **Gallery browse button**: Gallery tabs now include a `browse` button next to `+` that opens the relevant media subfolder (`persons`, `places`, `sources`, `citations`, etc.) so an already-uploaded file can be linked directly.
-> - **Copy/move dialog UX polish**: copy/move prompt button order is now `Copy` then `Move`, with Swedish strings added for the new import/browse flow.
-> - **Media view drag-and-drop hardening**: dropping files in the Media category now copies into the configured media base path (instead of only keeping an external path), with a destination category selector and optional prompt to open the media editor for linking.
+> Scope:
+> - This block documents **fork-specific changes** on branch `slashmad` in this `gramps` repo.
 >
-> Why:
-> - Avoid external-path references (for example Downloads) and keep media libraries self-contained.
-> - Reduce duplicate media files while still allowing shared reuse across references.
-> - Let users choose whether imported files should be retained in original location or moved into the managed media tree.
-> - Speed up linking to existing media files without opening a generic media selector dialog.
+> Desktop media workflow patches:
+> - **Auto-import to typed subfolders**: media selected from editors/galleries is copied into the configured media base path and organized under `persons`, `families`, `events`, `places`, `sources`, `citations`.
+> - **Duplicate reuse prompt**: if an identical file is already present in the media tree, the user can reuse it instead of creating a duplicate.
+> - **Copy/Move import prompt**: import flow now asks whether to copy (keep source) or move (relocate source) the selected file.
+> - **Gallery browse button**: gallery tabs include a button next to `+` that opens the relevant category folder directly and allows linking already-managed files.
+> - **Media view drag-and-drop hardening**: drag-and-drop in Media view imports into managed media paths (instead of leaving unmanaged external file references), with category routing support.
+>
+> UX and localization:
+> - **Safer copy-first flow**: button order and default response are tuned for copy-first behavior.
+> - **Swedish strings for new flows**: new media import/browse strings are translated in `po/sv.po` (with runtime fallback where needed).
+>
+> Build/version policy in this fork:
+> - Keep upstream app version as **`6.0.6`** (no local build identity suffix in runtime version string).
+>
+> Related fork work (separate repos):
+> - `slashmad/addons-source`: Theme/Dark mode add-on improvements and GrampsWebSync local patching used in this environment.
 
 [The Gramps Project](https://gramps-project.org)
 ===================

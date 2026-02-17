@@ -5,12 +5,10 @@
 > - **Media auto-copy by object type**: when adding media from editors/galleries, selected files are copied into the configured base media path and organized into subfolders: `persons`, `families`, `events`, `places`, `sources`, `citations`.
 > - **Media reuse prompt**: when importing a file and an identical file already exists in the media tree, the UI asks whether to reuse the existing file instead of copying a duplicate.
 > - **Media view drag-and-drop hardening**: dropping files in the Media category now copies into the configured media base path (instead of only keeping an external path), with a destination category selector and optional prompt to open the media editor for linking.
-> - **Custom side-by-side build identity**: local build version is set to `6.0.6+slashmad.0.1` and GTK application ID changed to `org.gramps_project.GrampsSlashmad` so the patched build can run next to standard Gramps installs.
 >
 > Why:
 > - Avoid external-path references (for example Downloads) and keep media libraries self-contained.
 > - Reduce duplicate media files while still allowing shared reuse across references.
-> - Allow testing patched desktop builds without replacing the existing Flatpak/system Gramps install.
 
 [The Gramps Project](https://gramps-project.org)
 ===================

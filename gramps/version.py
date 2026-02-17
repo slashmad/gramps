@@ -19,6 +19,6 @@
 
 DEV_VERSION = False
 VERSION_TUPLE = (6, 0, 6)
-VERSION_QUALIFIER = "+slashmad.0.1"
+VERSION_QUALIFIER = ""
 VERSION = ".".join(map(str, VERSION_TUPLE)) + VERSION_QUALIFIER
 major_version = "%s.%s" % (VERSION_TUPLE[0], VERSION_TUPLE[1])

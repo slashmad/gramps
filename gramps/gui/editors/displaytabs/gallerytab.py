@@ -48,6 +48,7 @@ from gi.repository import GLib
 from ...utils import is_right_click, open_file_with_default_application
 from ...dbguielement import DbGUIElement
 from ...selectors import SelectorFactory
+from ...widgets import SimpleButton
 from gramps.gen.lib import Media, MediaRef
 from gramps.gen.db import DbTxn
 from gramps.gen.utils.file import (
@@ -61,7 +62,11 @@ from gramps.gen.errors import WindowActiveError
 from gramps.gen.mime import get_type, is_valid_type
 from ...ddtargets import DdTargets
 from .buttontab import ButtonTab
-from ..addmedia import copy_media_file_to_tree, MediaImportCancelledError
+from ..addmedia import (
+    copy_media_file_to_tree,
+    media_category_to_subdir,
+    MediaImportCancelledError,
+)
 from gramps.gen.const import THUMBSCALE
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
@@ -131,6 +136,18 @@ class GalleryTab(ButtonTab, DbGUIElement):
             }
         )
         self.callman.connect_all(keys=["media"])
+
+    def _create_buttons(self, share_button, move_buttons, jump_button, top_label):
+        super()._create_buttons(share_button, move_buttons, jump_button, top_label)
+        self.browse_btn = SimpleButton("document-open", self.browse_button_clicked)
+        self.browse_btn.set_tooltip_text(_("Browse media folder"))
+        self.track_ref_for_deletion("browse_btn")
+        hbox = self.add_btn.get_parent()
+        hbox.pack_start(self.browse_btn, False, True, 0)
+        hbox.reorder_child(self.browse_btn, 1)
+        self.browse_btn.show()
+        if self.dbstate.db.readonly:
+            self.browse_btn.set_sensitive(False)
 
     def double_click(self, obj, event):
         """
@@ -305,6 +322,101 @@ class GalleryTab(ButtonTab, DbGUIElement):
             path = node[0].get_indices()
             return self.media_list[path[0]]
         return None
+
+    def _browse_default_folder(self):
+        base_dir = str(media_path(self.dbstate.db))
+        if not os.path.isdir(base_dir):
+            return None
+        subdir = media_category_to_subdir(self.media_category)
+        if not subdir:
+            return base_dir
+        category_dir = os.path.join(base_dir, subdir)
+        return category_dir if os.path.isdir(category_dir) else base_dir
+
+    def _media_from_file_path(self, selected_path):
+        selected_abs = os.path.abspath(selected_path)
+        for media_obj in self.dbstate.db.iter_media():
+            media_abs = os.path.abspath(
+                media_path_full(self.dbstate.db, media_obj.get_path())
+            )
+            if media_abs == selected_abs:
+                return media_obj
+        return None
+
+    def browse_button_clicked(self, obj):
+        chooser = Gtk.FileChooserDialog(
+            title=_("Select media file"),
+            transient_for=self.uistate.window,
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        chooser.add_buttons(
+            _("_Cancel"),
+            Gtk.ResponseType.CANCEL,
+            _("_Open"),
+            Gtk.ResponseType.ACCEPT,
+        )
+        chooser.set_select_multiple(False)
+        start_dir = self._browse_default_folder()
+        if start_dir:
+            chooser.set_current_folder(start_dir)
+
+        response = chooser.run()
+        selected_path = chooser.get_filename()
+        chooser.destroy()
+        if response != Gtk.ResponseType.ACCEPT or not selected_path:
+            return
+        if not os.path.isfile(selected_path):
+            return
+
+        media_obj = self._media_from_file_path(selected_path)
+        if media_obj:
+            media_ref = MediaRef()
+            media_ref.set_reference_handle(media_obj.get_handle())
+            self.add_callback(media_ref, media_obj)
+            return
+
+        base_dir = str(media_path(self.dbstate.db))
+        selected_abs = os.path.abspath(selected_path)
+        base_abs = os.path.abspath(base_dir)
+        in_media_base = (
+            os.path.isdir(base_abs)
+            and os.path.commonpath([base_abs, selected_abs]) == base_abs
+        )
+        if not in_media_base:
+            from ...dialog import WarningDialog
+
+            WarningDialog(
+                _("Media file is outside the media base path"),
+                _("Use Add to import files from outside the media folder."),
+                parent=self.uistate.window,
+            )
+            return
+
+        mime = get_type(selected_path)
+        if not is_valid_type(mime):
+            from ...dialog import WarningDialog
+
+            WarningDialog(
+                _("Cannot import media file"),
+                _("Unsupported media type."),
+                parent=self.uistate.window,
+            )
+            return
+
+        photo = Media()
+        photo.set_checksum(create_checksum(selected_path))
+        photo.set_mime_type(mime)
+        photo_path = relative_path(selected_path, base_dir)
+        photo.set_path(photo_path)
+        basename = os.path.basename(photo_path)
+        (root, ext) = os.path.splitext(basename)
+        photo.set_description(root)
+        with DbTxn(_("Add Media Object"), self.dbstate.db) as trans:
+            self.dbstate.db.add_media(photo, trans)
+
+        media_ref = MediaRef()
+        media_ref.set_reference_handle(photo.get_handle())
+        self.add_callback(media_ref, photo)
 
     def add_button_clicked(self, obj):
         try:

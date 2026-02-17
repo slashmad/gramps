@@ -41,7 +41,7 @@ import shutil
 # GTK/Gnome modules
 #
 # -------------------------------------------------------------------------
-from gi.repository import GdkPixbuf
+from gi.repository import GdkPixbuf, Gtk
 
 # -------------------------------------------------------------------------
 #
@@ -91,6 +91,21 @@ class MediaImportCancelledError(Exception):
     """Raised when the user cancels media import."""
 
 
+def _is_swedish_locale():
+    try:
+        lang = (glocale.language[0] or "").lower()
+    except (AttributeError, IndexError, TypeError):
+        return False
+    return lang.startswith("sv")
+
+
+def _translate_with_sv_fallback(msgid, sv_msg):
+    translated = _(msgid)
+    if translated == msgid and _is_swedish_locale():
+        return sv_msg
+    return translated
+
+
 def _next_available_filename(directory, filename):
     root, ext = os.path.splitext(filename)
     candidate = filename
@@ -133,23 +148,32 @@ def _ask_use_existing(existing_abs, source_abs, parent=None):
 
 
 def _ask_copy_or_move(source_abs, target_dir, parent=None):
+    title = _translate_with_sv_fallback(
+        "How should this media file be imported?",
+        "Hur ska den här mediefilen importeras?",
+    )
+    body = _translate_with_sv_fallback(
+        "Selected file: %s\n\nDestination folder: %s\n\n"
+        "Copy keeps the original file in place. Move relocates it.",
+        "Vald fil: %s\n\nMålmapp: %s\n\n"
+        "Kopiera behåller originalfilen. Flytta flyttar den.",
+    ) % (source_abs, target_dir)
+    move_label = _translate_with_sv_fallback("_Move", "_Flytta")
+    copy_label = _translate_with_sv_fallback("_Copy", "_Kopiera")
     dialog = QuestionDialog3(
-        _("How should this media file be imported?"),
-        _(
-            "Selected file: %s\n\nDestination folder: %s\n\n"
-            "Copy keeps the original file in place. Move relocates it."
-        )
-        % (source_abs, target_dir),
-        _("_Copy"),
-        _("_Move"),
+        title,
+        body,
+        move_label,
+        copy_label,
         parent=parent,
     )
+    dialog.top.set_default_response(Gtk.ResponseType.NO)
     response = dialog.run()
     if response == -1:
         return None
     if response:
-        return "copy"
-    return "move"
+        return "move"
+    return "copy"
 
 
 def _remove_source_if_needed(source_abs, target_abs, transfer_mode):

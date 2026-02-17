@@ -45257,3 +45257,71 @@ msgstr "Inget mallblad"
 
 #~ msgid "You need to set a 'default person' to go to."
 #~ msgstr "Du måste bestämma en 'standardperson' att hoppa till."
+
+#: ../gramps/gui/editors/addmedia.py:122
+msgid "A matching media file already exists."
+msgstr "En matchande mediefil finns redan."
+
+#: ../gramps/gui/editors/addmedia.py:124
+msgid ""
+"Existing file: %s\n"
+"\n"
+"Selected file: %s\n"
+"\n"
+"Use the existing file instead of copying a new one?"
+msgstr ""
+"Befintlig fil: %s\n"
+"\n"
+"Vald fil: %s\n"
+"\n"
+"Använd den befintliga filen i stället för att kopiera en ny?"
+
+#: ../gramps/gui/editors/addmedia.py:129
+msgid "_Use existing"
+msgstr "_Använd befintlig"
+
+#: ../gramps/gui/editors/addmedia.py:130
+msgid "_Copy new"
+msgstr "_Kopiera ny"
+
+#: ../gramps/gui/editors/addmedia.py:139
+msgid "How should this media file be imported?"
+msgstr "Hur ska den här mediefilen importeras?"
+
+#: ../gramps/gui/editors/addmedia.py:142
+msgid ""
+"Selected file: %s\n"
+"\n"
+"Destination folder: %s\n"
+"\n"
+"Copy keeps the original file in place. Move relocates it."
+msgstr ""
+"Vald fil: %s\n"
+"\n"
+"Målmapp: %s\n"
+"\n"
+"Kopiera behåller originalfilen. Flytta flyttar den."
+
+#: ../gramps/gui/editors/addmedia.py:146
+msgid "_Move"
+msgstr "_Flytta"
+
+#: ../gramps/gui/editors/displaytabs/gallerytab.py:125
+msgid "Browse media folder"
+msgstr "Bläddra i mediamapp"
+
+#: ../gramps/gui/editors/displaytabs/gallerytab.py:355
+msgid "Select media file"
+msgstr "Välj mediefil"
+
+#: ../gramps/gui/editors/displaytabs/gallerytab.py:397
+msgid "Media file is outside the media base path"
+msgstr "Mediefilen ligger utanför basmappen för media"
+
+#: ../gramps/gui/editors/displaytabs/gallerytab.py:399
+msgid "Use Add to import files from outside the media folder."
+msgstr "Använd Lägg till för att importera filer utanför mediamappen."
+
+#: ../gramps/gui/editors/displaytabs/gallerytab.py:412
+msgid "Unsupported media type."
+msgstr "Mediatypen stöds inte."

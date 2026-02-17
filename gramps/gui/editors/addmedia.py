@@ -26,7 +26,9 @@ Provide the interface to allow a person to add a media object to the database.
 # Standard python modules
 #
 # -------------------------------------------------------------------------
+import filecmp
 import os
+import shutil
 
 # -------------------------------------------------------------------------
 #
@@ -69,6 +71,67 @@ WIKI_HELP_PAGE = URL_MANUAL_SECT2
 WIKI_HELP_SEC = _("Select_a_media_selector", "manual")
 
 
+MEDIA_CATEGORY_TO_SUBDIR = {
+    "person": "persons",
+    "family": "families",
+    "event": "events",
+    "place": "places",
+    "source": "sources",
+    "citation": "citations",
+}
+
+
+def _next_available_filename(directory, filename):
+    root, ext = os.path.splitext(filename)
+    candidate = filename
+    index = 1
+    while os.path.exists(os.path.join(directory, candidate)):
+        candidate = f"{root}_{index}{ext}"
+        index += 1
+    return candidate
+
+
+def media_category_to_subdir(media_category):
+    if not media_category:
+        return None
+    return MEDIA_CATEGORY_TO_SUBDIR.get(media_category.lower())
+
+
+def copy_media_file_to_tree(db, source_path, media_category=None):
+    """
+    Copy media file into the family tree media base path and return the
+    path relative to the base path.
+    """
+    if source_path.startswith(("http://", "https://")):
+        return source_path
+    if not os.path.isfile(source_path):
+        raise FileNotFoundError(source_path)
+
+    base_dir = str(media_path(db))
+    os.makedirs(base_dir, exist_ok=True)
+
+    target_dir = base_dir
+    subdir = media_category_to_subdir(media_category)
+    if subdir:
+        target_dir = os.path.join(base_dir, subdir)
+    os.makedirs(target_dir, exist_ok=True)
+
+    source_abs = os.path.abspath(source_path)
+    target_abs = os.path.abspath(os.path.join(target_dir, os.path.basename(source_abs)))
+
+    if source_abs != target_abs:
+        if os.path.exists(target_abs):
+            if filecmp.cmp(source_abs, target_abs, shallow=False):
+                return relative_path(target_abs, base_dir)
+            target_abs = os.path.join(
+                target_dir,
+                _next_available_filename(target_dir, os.path.basename(source_abs)),
+            )
+        shutil.copy2(source_abs, target_abs)
+
+    return relative_path(target_abs, base_dir)
+
+
 # -------------------------------------------------------------------------
 #
 # AddMedia
@@ -80,7 +143,16 @@ class AddMedia(ManagedWindow):
     a file from the file system, while providing a description.
     """
 
-    def __init__(self, dbstate, uistate, track, media, callback=None):
+    def __init__(
+        self,
+        dbstate,
+        uistate,
+        track,
+        media,
+        callback=None,
+        media_category=None,
+        auto_copy=False,
+    ):
         """
         Create and displays the dialog box
 
@@ -93,6 +165,8 @@ class AddMedia(ManagedWindow):
         self.dbase = dbstate.db
         self.obj = media
         self.callback = callback
+        self.media_category = media_category
+        self.auto_copy = auto_copy
 
         self.last_directory = config.get("behavior.addmedia-image-dir")
         self.relative_path = config.get("behavior.addmedia-relative-path")
@@ -164,7 +238,17 @@ class AddMedia(ManagedWindow):
         filename = self.file_text.get_filename()
         full_file = filename
 
-        if self.relpath.get_active():
+        if self.auto_copy:
+            try:
+                filename = copy_media_file_to_tree(
+                    self.dbase, full_file, self.media_category
+                )
+            except OSError as err:
+                msgstr = _("Cannot import %s")
+                msgstr2 = _("Unable to copy media file to the media path: %s")
+                ErrorDialog(msgstr % full_file, msgstr2 % err, parent=self.window)
+                return
+        elif self.relpath.get_active():
             pname = str(media_path(self.dbase))
             if not os.path.exists(pname):
                 msgstr = _("Cannot import %s")
@@ -187,7 +271,7 @@ class AddMedia(ManagedWindow):
         self.obj.set_path(name)
 
         self.last_directory = os.path.dirname(full_file)
-        self.relative_path = self.relpath.get_active()
+        self.relative_path = self.relpath.get_active() or self.auto_copy
 
         self._cleanup_on_exit()
         if self.callback:

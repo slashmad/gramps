@@ -61,6 +61,7 @@ from gramps.gen.errors import WindowActiveError
 from gramps.gen.mime import get_type, is_valid_type
 from ...ddtargets import DdTargets
 from .buttontab import ButtonTab
+from ..addmedia import copy_media_file_to_tree
 from gramps.gen.const import THUMBSCALE
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
@@ -85,7 +86,16 @@ class GalleryTab(ButtonTab, DbGUIElement):
     _DND_TYPE = DdTargets.MEDIAREF
     _DND_EXTRA = DdTargets.URI_LIST
 
-    def __init__(self, dbstate, uistate, track, media_list, update=None):
+    def __init__(
+        self,
+        dbstate,
+        uistate,
+        track,
+        media_list,
+        update=None,
+        media_category=None,
+        auto_copy_media=True,
+    ):
         self.iconlist = Gtk.IconView()
         ButtonTab.__init__(
             self,
@@ -101,6 +111,8 @@ class GalleryTab(ButtonTab, DbGUIElement):
         self.media_list = media_list
         self.callman.register_handles({"media": [mref.ref for mref in self.media_list]})
         self.update = update
+        self.media_category = media_category
+        self.auto_copy_media = auto_copy_media
 
         self._set_dnd()
 
@@ -305,6 +317,8 @@ class GalleryTab(ButtonTab, DbGUIElement):
                 Media(),
                 MediaRef(),
                 self.add_callback,
+                media_category=self.media_category,
+                auto_copy_media=self.auto_copy_media,
             )
         except WindowActiveError:
             pass
@@ -367,6 +381,8 @@ class GalleryTab(ButtonTab, DbGUIElement):
                             src,
                             sref,
                             self.add_callback,
+                            media_category=self.media_category,
+                            auto_copy_media=self.auto_copy_media,
                         )
                     except WindowActiveError:
                         from ...dialog import WarningDialog
@@ -391,7 +407,14 @@ class GalleryTab(ButtonTab, DbGUIElement):
                 from .. import EditMediaRef
 
                 EditMediaRef(
-                    self.dbstate, self.uistate, self.track, obj, ref, self.edit_callback
+                    self.dbstate,
+                    self.uistate,
+                    self.track,
+                    obj,
+                    ref,
+                    self.edit_callback,
+                    media_category=self.media_category,
+                    auto_copy_media=self.auto_copy_media,
                 )
             except WindowActiveError:
                 from ...dialog import WarningDialog
@@ -610,16 +633,34 @@ class GalleryTab(ButtonTab, DbGUIElement):
                     protocol, site, mfile, j, k, l = urlparse(file)
                     if protocol == "file":
                         name = url2pathname(mfile)
+                        checksum_path = name
                         mime = get_type(name)
                         if not is_valid_type(mime):
                             return
+                        if self.auto_copy_media:
+                            try:
+                                name = copy_media_file_to_tree(
+                                    self.dbstate.db, name, self.media_category
+                                )
+                                checksum_path = media_path_full(self.dbstate.db, name)
+                            except OSError as err:
+                                from ...dialog import WarningDialog
+
+                                WarningDialog(
+                                    _("Cannot import media file"),
+                                    _("Unable to copy media file to the media path: %s")
+                                    % err,
+                                    parent=self.uistate.window,
+                                )
+                                continue
                         photo = Media()
                         self.uistate.set_busy_cursor(True)
-                        photo.set_checksum(create_checksum(name))
+                        photo.set_checksum(create_checksum(checksum_path))
                         self.uistate.set_busy_cursor(False)
-                        base_dir = str(media_path(self.dbstate.db))
-                        if os.path.exists(base_dir):
-                            name = relative_path(name, base_dir)
+                        if not self.auto_copy_media:
+                            base_dir = str(media_path(self.dbstate.db))
+                            if os.path.exists(base_dir):
+                                name = relative_path(name, base_dir)
                         photo.set_path(name)
                         photo.set_mime_type(mime)
                         basename = os.path.basename(name)

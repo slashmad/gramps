@@ -193,6 +193,7 @@ class EditSource(EditPrimary):
             self.uistate,
             self.track,
             self.obj.get_media_list(),
+            media_category="source",
         )
         self._add_tab(notebook, self.gallery_tab)
         self.track_ref_for_deletion("gallery_tab")

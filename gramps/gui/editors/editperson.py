@@ -578,6 +578,7 @@ class EditPerson(EditPrimary):
             self.track,
             self.obj.get_media_list(),
             self.load_person_image,
+            media_category="person",
         )
         self._add_tab(notebook, self.gallery_tab)
         self.track_ref_for_deletion("gallery_tab")

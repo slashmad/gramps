@@ -89,12 +89,30 @@ WIKI_HELP_SEC = _("Media_Reference_Editor_dialog", "manual")
 #
 # -------------------------------------------------------------------------
 class EditMediaRef(EditReference):
-    def __init__(self, state, uistate, track, media, media_ref, update):
+    def __init__(
+        self,
+        state,
+        uistate,
+        track,
+        media,
+        media_ref,
+        update,
+        media_category=None,
+        auto_copy_media=False,
+    ):
+        self.media_category = media_category
+        self.auto_copy_media = auto_copy_media
         EditReference.__init__(self, state, uistate, track, media, media_ref, update)
         if not self.source.get_handle():
             # show the addmedia dialog immediately, with track of parent.
             AddMedia(
-                state, self.uistate, self.track, self.source, self._update_addmedia
+                state,
+                self.uistate,
+                self.track,
+                self.source,
+                self._update_addmedia,
+                media_category=self.media_category,
+                auto_copy=self.auto_copy_media,
             )
         else:
             self.original = deepcopy(self.source.serialize())
@@ -467,7 +485,13 @@ class EditMediaRef(EditReference):
         path = self.file_path.get_text()
         self.source.set_path(path)
         AddMedia(
-            self.dbstate, self.uistate, self.track, self.source, self._update_addmedia
+            self.dbstate,
+            self.uistate,
+            self.track,
+            self.source,
+            self._update_addmedia,
+            media_category=self.media_category,
+            auto_copy=self.auto_copy_media,
         )
 
     def _connect_signals(self):

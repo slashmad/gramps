@@ -238,6 +238,7 @@ class EditEvent(EditPrimary):
             self.uistate,
             self.track,
             self.obj.get_media_list(),
+            media_category="event",
         )
         self._add_tab(notebook, self.gallery_list)
 

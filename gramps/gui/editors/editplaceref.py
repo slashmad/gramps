@@ -331,6 +331,7 @@ class EditPlaceRef(EditReference):
             self.uistate,
             self.track,
             self.source.get_media_list(),
+            media_category="place",
         )
         self._add_tab(notebook, self.gallery_tab)
         self.track_ref_for_deletion("gallery_tab")

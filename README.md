@@ -14,6 +14,7 @@
 > UX and localization:
 > - **Safer copy-first flow**: button order and default response are tuned for copy-first behavior.
 > - **Swedish strings for new flows**: new media import/browse strings are translated in `po/sv.po` (with runtime fallback where needed).
+> - **Source/Citation autocomplete**: added focus-only, lazy-loaded autocomplete for source editor fields (`author`, `publication info`, `abbreviation`, `title`) and citation `volume/page`, based on existing stored values.
 >
 > Build/version policy in this fork:
 > - Keep upstream app version as **`6.0.6`** (no local build identity suffix in runtime version string).

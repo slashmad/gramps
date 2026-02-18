@@ -55,6 +55,7 @@ from .displaytabs import (
     CitationBackRefList,
     RepoEmbedList,
 )
+from ..autocomp import fill_entry_on_focus
 from ..widgets import MonitoredEntry, PrivacyButton, MonitoredTagList
 from ..dialog import ErrorDialog
 from ..glade import Glade
@@ -106,6 +107,8 @@ class EditSource(EditPrimary):
         self.glade = Glade()
         self.set_window(self.glade.toplevel, None, self.get_menu_title())
         self.setup_configs("interface.source", 600, 450)
+        self._focused_completions = []
+        self._source_completion_cache = None
 
     def _connect_signals(self):
         self.define_ok_button(self.glade.get_object("ok"), self.save)
@@ -121,6 +124,8 @@ class EditSource(EditPrimary):
         """
         self._add_db_signal("source-rebuild", self._do_close)
         self._add_db_signal("source-delete", self.check_for_close)
+        self._add_db_signal("source-add", self._invalidate_autocomplete_cache)
+        self._add_db_signal("source-update", self._invalidate_autocomplete_cache)
 
     def _setup_fields(self):
         self.author = MonitoredEntry(
@@ -172,6 +177,55 @@ class EditSource(EditPrimary):
             self.obj.get_title,
             self.db.readonly,
         )
+
+        self._setup_autocompletion()
+
+    def _invalidate_autocomplete_cache(self, *obj):
+        self._source_completion_cache = None
+        for completion in self._focused_completions:
+            completion.invalidate()
+
+    def _build_source_completion_cache(self):
+        cache = {
+            "author": set(),
+            "pubinfo": set(),
+            "abbrev": set(),
+            "title": set(),
+        }
+        for source in self.db.iter_sources():
+            cache["author"].add(source.get_author())
+            cache["pubinfo"].add(source.get_publication_info())
+            cache["abbrev"].add(source.get_abbreviation())
+            cache["title"].add(source.get_title())
+        return cache
+
+    def _get_source_completion_values(self, key):
+        if self._source_completion_cache is None:
+            self._source_completion_cache = self._build_source_completion_cache()
+        return self._source_completion_cache.get(key, ())
+
+    def _setup_autocompletion(self):
+        if self.db.readonly:
+            return
+
+        self._focused_completions = [
+            fill_entry_on_focus(
+                self.author.obj,
+                lambda: self._get_source_completion_values("author"),
+            ),
+            fill_entry_on_focus(
+                self.pubinfo.obj,
+                lambda: self._get_source_completion_values("pubinfo"),
+            ),
+            fill_entry_on_focus(
+                self.abbrev.obj,
+                lambda: self._get_source_completion_values("abbrev"),
+            ),
+            fill_entry_on_focus(
+                self.title.obj,
+                lambda: self._get_source_completion_values("title"),
+            ),
+        ]
 
     def _create_tabbed_pages(self):
         notebook = Gtk.Notebook()

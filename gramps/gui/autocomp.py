@@ -23,6 +23,13 @@ Provide autocompletion functionality.
 
 # -------------------------------------------------------------------------
 #
+# Python modules
+#
+# -------------------------------------------------------------------------
+import logging
+
+# -------------------------------------------------------------------------
+#
 # GNOME modules
 #
 # -------------------------------------------------------------------------
@@ -32,6 +39,22 @@ from gi.repository import GObject
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
 _ = glocale.translation.sgettext
+LOG = logging.getLogger(".autocomp")
+
+
+def _normalize_completion_values(data_list, max_items):
+    values = set()
+    for data in data_list:
+        if data is None:
+            continue
+        text = str(data).strip()
+        if text:
+            values.add(text)
+
+    normalized = sorted(values, key=glocale.sort_key)
+    if max_items:
+        return normalized[:max_items]
+    return normalized
 
 
 def fill_combo(combo, data_list):
@@ -69,6 +92,67 @@ def fill_entry(entry, data_list):
     completion.set_minimum_key_length(1)
     completion.set_text_column(0)
     entry.set_completion(completion)
+
+
+class FocusedEntryCompletion:
+    """
+    Enable lazy autocompletion only while an entry has focus.
+    """
+
+    def __init__(self, entry, data_provider, min_key_length=1, max_items=2000):
+        self.entry = entry
+        self.data_provider = data_provider
+        self.max_items = max_items
+        self.loaded = False
+
+        self.store = Gtk.ListStore(GObject.TYPE_STRING)
+        self.completion = Gtk.EntryCompletion()
+        self.completion.set_model(self.store)
+        self.completion.set_minimum_key_length(min_key_length)
+        self.completion.set_text_column(0)
+
+        self.entry.connect("focus-in-event", self._on_focus_in)
+        self.entry.connect("focus-out-event", self._on_focus_out)
+
+    def invalidate(self):
+        self.loaded = False
+
+    def _load(self):
+        if self.loaded:
+            return
+
+        values = []
+        try:
+            values = self.data_provider() or []
+        except Exception:
+            LOG.exception("Failed to load autocomplete values")
+
+        self.store.clear()
+        for value in _normalize_completion_values(values, self.max_items):
+            self.store.append(row=[value])
+
+        self.loaded = True
+
+    def _on_focus_in(self, _entry, _event):
+        self._load()
+        self.entry.set_completion(self.completion)
+        return False
+
+    def _on_focus_out(self, _entry, _event):
+        self.entry.set_completion(None)
+        return False
+
+
+def fill_entry_on_focus(entry, data_provider, min_key_length=1, max_items=2000):
+    """
+    Attach autocompletion to an entry only while it has keyboard focus.
+    """
+    return FocusedEntryCompletion(
+        entry,
+        data_provider,
+        min_key_length=min_key_length,
+        max_items=max_items,
+    )
 
 
 # -------------------------------------------------------------------------

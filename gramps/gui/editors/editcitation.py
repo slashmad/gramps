@@ -53,6 +53,7 @@ from gramps.gen.db import DbTxn
 from .editprimary import EditPrimary
 from .objectentries import SourceEntry
 from .displaytabs import NoteTab, GalleryTab, SrcAttrEmbedList, CitationBackRefList
+from ..autocomp import fill_entry_on_focus
 from ..widgets import (
     MonitoredEntry,
     PrivacyButton,
@@ -157,6 +158,8 @@ class EditCitation(EditPrimary):
         self.glade = Glade()
         self.set_window(self.glade.toplevel, None, self.get_menu_title())
         self.setup_configs("interface.citation", 600, 450)
+        self._focused_completions = []
+        self._citation_completion_cache = None
 
         self.share_btn = self.glade.get_object("select_source")
         self.add_del_btn = self.glade.get_object("add_del_source")
@@ -186,6 +189,8 @@ class EditCitation(EditPrimary):
 
         self._add_db_signal("citation-rebuild", self._do_close)
         self._add_db_signal("citation-delete", self.check_for_close)
+        self._add_db_signal("citation-add", self._invalidate_autocomplete_cache)
+        self._add_db_signal("citation-update", self._invalidate_autocomplete_cache)
         self._add_db_signal("source-delete", self.source_delete)
         self._add_db_signal("source-update", self.source_update)
 
@@ -228,6 +233,7 @@ class EditCitation(EditPrimary):
             self.obj.get_page,
             self.db.readonly,
         )
+        self._setup_autocompletion()
 
         self.type_mon = MonitoredMenu(
             self.glade.get_object("confidence"),
@@ -257,6 +263,27 @@ class EditCitation(EditPrimary):
         self.ref_privacy = PrivacyButton(
             self.glade.get_object("privacy"), self.obj, self.db.readonly
         )
+
+    def _invalidate_autocomplete_cache(self, *obj):
+        self._citation_completion_cache = None
+        for completion in self._focused_completions:
+            completion.invalidate()
+
+    def _get_citation_page_values(self):
+        if self._citation_completion_cache is None:
+            pages = set()
+            for citation in self.db.iter_citations():
+                pages.add(citation.get_page())
+            self._citation_completion_cache = pages
+        return self._citation_completion_cache
+
+    def _setup_autocompletion(self):
+        if self.db.readonly:
+            return
+
+        self._focused_completions = [
+            fill_entry_on_focus(self.volume.obj, self._get_citation_page_values)
+        ]
 
     def _create_tabbed_pages(self):
         """

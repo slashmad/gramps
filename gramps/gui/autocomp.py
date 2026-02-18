@@ -35,6 +35,7 @@ import logging
 # -------------------------------------------------------------------------
 from gi.repository import Gtk
 from gi.repository import GObject
+from gi.repository import Gdk
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
@@ -104,6 +105,7 @@ class FocusedEntryCompletion:
         self.data_provider = data_provider
         self.max_items = max_items
         self.loaded = False
+        self.suspended = False
 
         self.store = Gtk.ListStore(GObject.TYPE_STRING)
         self.completion = Gtk.EntryCompletion()
@@ -113,6 +115,7 @@ class FocusedEntryCompletion:
 
         self.entry.connect("focus-in-event", self._on_focus_in)
         self.entry.connect("focus-out-event", self._on_focus_out)
+        self.entry.connect("key-press-event", self._on_key_press)
 
     def invalidate(self):
         self.loaded = False
@@ -127,20 +130,31 @@ class FocusedEntryCompletion:
         except Exception:
             LOG.exception("Failed to load autocomplete values")
 
+        completion_values = _normalize_completion_values(values, self.max_items)
+
         self.store.clear()
-        for value in _normalize_completion_values(values, self.max_items):
+        for value in completion_values:
             self.store.append(row=[value])
 
         self.loaded = True
 
     def _on_focus_in(self, _entry, _event):
         self._load()
-        self.entry.set_completion(self.completion)
+        if not self.suspended:
+            self.entry.set_completion(self.completion)
         return False
 
     def _on_focus_out(self, _entry, _event):
+        self.suspended = False
         self.entry.set_completion(None)
         return False
+
+    def _on_key_press(self, entry, event):
+        if event.keyval != Gdk.KEY_Escape:
+            return False
+        self.suspended = True
+        entry.set_completion(None)
+        return True
 
 
 def fill_entry_on_focus(entry, data_provider, min_key_length=1, max_items=2000):

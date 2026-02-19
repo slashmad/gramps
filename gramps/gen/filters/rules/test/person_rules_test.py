@@ -21,6 +21,7 @@
 """
 Unittest that tests person-specific filter rules
 """
+
 import unittest
 import os
 from time import perf_counter
@@ -58,7 +59,13 @@ from ..person import (
     HasNickname,
     HasRelationship,
     HasSoundexName,
+    HasSourceCount,
     HasSourceOf,
+    IsNotRelatedWithPersonOrHome,
+    IsRelatedWithPersonOrHome,
+    PersonHasSourceCountIncludingEvents,
+    PersonHasSourceOfIncludingEvents,
+    PersonMissingSourcesIncludingEvents,
     HasTextMatchingRegexpOf,
     HasUnknownGender,
     HaveAltFamilies,
@@ -97,6 +104,10 @@ from ..person import (
     ProbablyAlive,
     RegExpName,
     RelationshipPathBetweenBookmarks,
+)
+from ..person._eventcitationutils import (
+    collect_object_and_child_citation_handles,
+    collect_person_and_linked_event_citation_handles,
 )
 
 EXAMPLE = os.path.join(TEST_DIR, "example.gramps")
@@ -184,6 +195,34 @@ class BaseTest(unittest.TestCase):
         # rulename = frame.f_back.f_code.co_name
         # print("%s: %.2f\n" % (rulename, perf_counter() - stime))
         return set(results)
+
+    def find_event_only_person_source(self):
+        """
+        Find one person with citations only via linked events and return
+        (person_handle, source_gramps_id).
+        """
+        for person in self.db.iter_people():
+            person_and_children_citations = collect_object_and_child_citation_handles(
+                person
+            )
+            if person_and_children_citations:
+                continue
+
+            combined_citations = collect_person_and_linked_event_citation_handles(
+                self.db, person
+            )
+            if not combined_citations:
+                continue
+
+            for citation_handle in combined_citations:
+                citation = self.db.get_citation_from_handle(citation_handle)
+                if citation is None or not citation.source_handle:
+                    continue
+                source = self.db.get_source_from_handle(citation.source_handle)
+                if source and source.gramps_id:
+                    return person.handle, source.gramps_id
+
+        return None, None
 
     def test_Complex_1(self):
         """Test with two ancestor trees in base filter, and a complex
@@ -812,6 +851,51 @@ class BaseTest(unittest.TestCase):
             ),
         )
 
+    def test_hassourcecountincludingevents_event_only_person(self):
+        """
+        Event-only sourced people are excluded from 0-source result when using
+        person+event source scope.
+        """
+        person_handle, _source_id = self.find_event_only_person_source()
+        if person_handle is None:
+            self.skipTest("example database has no event-only sourced person fixture")
+
+        legacy_zero = self.filter_with_rule(HasSourceCount(["0", "equal to"]))
+        scoped_zero = self.filter_with_rule(
+            PersonHasSourceCountIncludingEvents(["0", "equal to"])
+        )
+        scoped_gt0 = self.filter_with_rule(
+            PersonHasSourceCountIncludingEvents(["0", "greater than"])
+        )
+
+        self.assertIn(person_handle, legacy_zero)
+        self.assertNotIn(person_handle, scoped_zero)
+        self.assertIn(person_handle, scoped_gt0)
+
+    def test_hassourceofincludingevents_matches_event_source(self):
+        """
+        Person+event source filter should match event-only sourced people.
+        """
+        person_handle, source_id = self.find_event_only_person_source()
+        if person_handle is None or source_id is None:
+            self.skipTest("example database has no event-only sourced person fixture")
+
+        legacy = self.filter_with_rule(HasSourceOf([source_id]))
+        scoped = self.filter_with_rule(PersonHasSourceOfIncludingEvents([source_id]))
+
+        self.assertNotIn(person_handle, legacy)
+        self.assertIn(person_handle, scoped)
+
+    def test_missingsourcesincludingevents_matches_zero_count(self):
+        """
+        Missing-source shortcut should match 0 count in person+event scope.
+        """
+        missing = self.filter_with_rule(PersonMissingSourcesIncludingEvents([]))
+        scoped_zero = self.filter_with_rule(
+            PersonHasSourceCountIncludingEvents(["0", "equal to"])
+        )
+        self.assertEqual(missing, scoped_zero)
+
     def test_havealtfamilies(self):
         """
         Test HaveAltFamilies rule.
@@ -1070,6 +1154,62 @@ class BaseTest(unittest.TestCase):
                 ]
             ),
         )
+
+    def test_isrelatedwithpersonorhome_explicit_matches_legacy(self):
+        """
+        Explicit person mode should match legacy IsRelatedWith behavior.
+        """
+        legacy = self.filter_with_rule(IsRelatedWith(["I1844"]))
+        new_rule = self.filter_with_rule(
+            IsRelatedWithPersonOrHome(["explicit_person_id", "I1844"])
+        )
+        self.assertEqual(new_rule, legacy)
+
+    def test_isrelatedwithpersonorhome_home_matches_default(self):
+        """
+        Home person mode should match explicit mode for the current default person.
+        """
+        default_person = self.db.get_default_person()
+        self.assertIsNotNone(default_person)
+        legacy = self.filter_with_rule(IsRelatedWith([default_person.gramps_id]))
+        home_mode = self.filter_with_rule(
+            IsRelatedWithPersonOrHome(["home_person", ""])
+        )
+        self.assertEqual(home_mode, legacy)
+
+    def test_isnotrelatedwithpersonorhome_partitions_population(self):
+        """
+        Related and not-related sets should be disjoint and cover all people.
+        """
+        related = self.filter_with_rule(
+            IsRelatedWithPersonOrHome(["explicit_person_id", "I1844"])
+        )
+        not_related = self.filter_with_rule(
+            IsNotRelatedWithPersonOrHome(["explicit_person_id", "I1844"])
+        )
+        all_people = set(self.db.get_person_handles())
+
+        self.assertEqual(related & not_related, set())
+        self.assertEqual(related | not_related, all_people)
+
+    def test_isrelatedwithpersonorhome_home_without_default_is_empty(self):
+        """
+        Missing Home Person should not silently return broad matches.
+        """
+        original_default = self.db.get_default_handle()
+        self.db.set_default_person_handle(None)
+        try:
+            related = self.filter_with_rule(
+                IsRelatedWithPersonOrHome(["home_person", ""])
+            )
+            not_related = self.filter_with_rule(
+                IsNotRelatedWithPersonOrHome(["home_person", ""])
+            )
+        finally:
+            self.db.set_default_person_handle(original_default)
+
+        self.assertEqual(related, set())
+        self.assertEqual(not_related, set())
 
     def test_hasidof_empty(self):
         """

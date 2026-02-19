@@ -121,6 +121,8 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
             GObject.TYPE_STRING,  # 2==parents
             GObject.TYPE_STRING,  # 3==tags
             GObject.TYPE_STRING,
+            GObject.TYPE_STRING,  # 5==component size
+            GObject.TYPE_STRING,
         )  # 4==family gid (not shown to user)
 
         # note -- don't assign the model to the tree until it has been populated,
@@ -130,22 +132,32 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
         col2 = Gtk.TreeViewColumn(_("ID"), Gtk.CellRendererText(), text=1)
         col3 = Gtk.TreeViewColumn(_("Parents"), Gtk.CellRendererText(), text=2)
         col4 = Gtk.TreeViewColumn(_("Tags"), Gtk.CellRendererText(), text=3)
+        col5 = Gtk.TreeViewColumn(_("Component"), Gtk.CellRendererText(), text=5)
+        col6 = Gtk.TreeViewColumn(_("Diagnostic"), Gtk.CellRendererText(), text=6)
         col1.set_resizable(True)
         col2.set_resizable(True)
         col3.set_resizable(True)
         col4.set_resizable(True)
+        col5.set_resizable(True)
+        col6.set_resizable(True)
         col1.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         col2.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         col3.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         col4.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        col5.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        col6.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         col1.set_sort_column_id(0)
         #        col2.set_sort_column_id(1)
         #        col3.set_sort_column_id(2)
         col4.set_sort_column_id(3)
+        col5.set_sort_column_id(5)
+        col6.set_sort_column_id(6)
         self.treeView.append_column(col1)
         self.treeView.append_column(col2)
         self.treeView.append_column(col3)
         self.treeView.append_column(col4)
+        self.treeView.append_column(col5)
+        self.treeView.append_column(col6)
         self.treeSelection = self.treeView.get_selection()
         self.treeSelection.set_mode(Gtk.SelectionMode.MULTIPLE)
         self.treeSelection.set_select_function(self.selectIsAllowed, None)
@@ -169,6 +181,7 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
         # now that we have our list of related people, find everyone
         # in the database who isn't on our list
         self.findUnrelatedPeople()
+        self.build_component_diagnostics()
 
         # populate the treeview model with the names of unrelated people
         if self.numberOfUnrelatedPeople == 0:
@@ -264,7 +277,7 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
                 )
 
             # iterate through all of the selected rows
-            (model, paths) = self.treeSelection.get_selected_rows()
+            model, paths = self.treeSelection.get_selected_rows()
 
             for path in paths:
                 if progress:
@@ -327,55 +340,126 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
             # remember that we've now seen this person
             self.handlesOfPeopleAlreadyProcessed.add(handle)
 
-            # we have 4 things to do:  find (1) spouses, (2) parents, siblings(3), and (4) children
+            for related_handle in self.get_related_neighbor_handles(person):
+                if related_handle not in self.handlesOfPeopleAlreadyProcessed:
+                    self.handlesOfPeopleToBeProcessed.add(related_handle)
 
-            # step 1 -- spouses
-            for familyHandle in person.get_family_handle_list():
-                family = self.db.get_family_from_handle(familyHandle)
-                spouseHandle = utils.find_spouse(person, family)
-                if (
-                    spouseHandle
-                    and spouseHandle not in self.handlesOfPeopleAlreadyProcessed
-                ):
-                    self.handlesOfPeopleToBeProcessed.add(spouseHandle)
+    def get_related_neighbor_handles(self, person):
+        """
+        Return neighbor handles in the person-family graph.
+        """
+        handles = set()
 
-            # step 2 -- parents
-            for familyHandle in person.get_parent_family_handle_list():
-                family = self.db.get_family_from_handle(familyHandle)
-                fatherHandle = family.get_father_handle()
-                motherHandle = family.get_mother_handle()
-                if (
-                    fatherHandle
-                    and fatherHandle not in self.handlesOfPeopleAlreadyProcessed
-                ):
-                    self.handlesOfPeopleToBeProcessed.add(fatherHandle)
-                if (
-                    motherHandle
-                    and motherHandle not in self.handlesOfPeopleAlreadyProcessed
-                ):
-                    self.handlesOfPeopleToBeProcessed.add(motherHandle)
+        for familyHandle in person.get_family_handle_list():
+            family = self.db.get_family_from_handle(familyHandle)
+            if not family:
+                continue
 
-            # step 3 -- siblings
-            for familyHandle in person.get_parent_family_handle_list():
-                family = self.db.get_family_from_handle(familyHandle)
-                for childRef in family.get_child_ref_list():
-                    childHandle = childRef.ref
-                    if (
-                        childHandle
-                        and childHandle not in self.handlesOfPeopleAlreadyProcessed
-                    ):
-                        self.handlesOfPeopleToBeProcessed.add(childHandle)
+            spouseHandle = utils.find_spouse(person, family)
+            if spouseHandle:
+                handles.add(spouseHandle)
 
-            # step 4 -- children
-            for familyHandle in person.get_family_handle_list():
-                family = self.db.get_family_from_handle(familyHandle)
-                for childRef in family.get_child_ref_list():
-                    childHandle = childRef.ref
-                    if (
-                        childHandle
-                        and childHandle not in self.handlesOfPeopleAlreadyProcessed
-                    ):
-                        self.handlesOfPeopleToBeProcessed.add(childHandle)
+            for childRef in family.get_child_ref_list():
+                if childRef and childRef.ref:
+                    handles.add(childRef.ref)
+
+        for familyHandle in person.get_parent_family_handle_list():
+            family = self.db.get_family_from_handle(familyHandle)
+            if not family:
+                continue
+
+            fatherHandle = family.get_father_handle()
+            motherHandle = family.get_mother_handle()
+            if fatherHandle:
+                handles.add(fatherHandle)
+            if motherHandle:
+                handles.add(motherHandle)
+
+            for childRef in family.get_child_ref_list():
+                if childRef and childRef.ref:
+                    handles.add(childRef.ref)
+
+        return handles
+
+    def get_component_handles(self, start_handle):
+        """
+        Return all handles in the same family-graph component as start_handle.
+        """
+        seen = set()
+        todo = {start_handle}
+
+        while todo:
+            handle = todo.pop()
+            if handle in seen:
+                continue
+            seen.add(handle)
+
+            person = self.db.get_person_from_handle(handle)
+            if not person:
+                continue
+
+            for related_handle in self.get_related_neighbor_handles(person):
+                if related_handle not in seen:
+                    todo.add(related_handle)
+
+        return seen
+
+    def get_component_diagnostic(self, person, component_size):
+        """
+        Return a short diagnostic reason for why a person is disconnected.
+        """
+        if (
+            not person.get_parent_family_handle_list()
+            and not person.get_family_handle_list()
+        ):
+            return _("Isolated person (no family links)")
+
+        if component_size == 1:
+            return _("Single-person component")
+
+        for family_handle in (
+            person.get_family_handle_list() + person.get_parent_family_handle_list()
+        ):
+            family = self.db.get_family_from_handle(family_handle)
+            if not family:
+                continue
+            parent_count = len(
+                [
+                    h
+                    for h in (family.get_father_handle(), family.get_mother_handle())
+                    if h
+                ]
+            )
+            if parent_count < 2:
+                return _("Separate component (possible missing family bridge)")
+
+        return _("Separate family component")
+
+    def build_component_diagnostics(self):
+        """
+        Build per-handle diagnostics for unrelated people.
+        """
+        self.component_size_by_handle = {}
+        self.component_reason_by_handle = {}
+
+        seen = set()
+        for handle in self.handlesOfPeopleNotRelated:
+            if handle in seen:
+                continue
+
+            component_handles = self.get_component_handles(handle)
+            component_size = len(component_handles)
+            seen.update(component_handles)
+
+            for comp_handle in component_handles:
+                self.component_size_by_handle[comp_handle] = str(component_size)
+                person = self.db.get_person_from_handle(comp_handle)
+                if person:
+                    self.component_reason_by_handle[comp_handle] = (
+                        self.get_component_diagnostic(person, component_size)
+                    )
+                else:
+                    self.component_reason_by_handle[comp_handle] = _("Unknown")
 
     def findUnrelatedPeople(self):
         # update our numbers
@@ -474,10 +558,23 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
 
             # if we don't have a valid iter, then create a new top-level node
             if not iter:
-                iter = self.model.append(None, [surname, "", "", "", ""])
+                iter = self.model.append(None, [surname, "", "", "", "", "", ""])
 
             # finally, we now get to add this person to the model
-            self.model.append(iter, [name, gid, parentNames, tag_list, familygid])
+            component_size = self.component_size_by_handle.get(handle, "")
+            diagnostic = self.component_reason_by_handle.get(handle, "")
+            self.model.append(
+                iter,
+                [
+                    name,
+                    gid,
+                    parentNames,
+                    tag_list,
+                    familygid,
+                    component_size,
+                    diagnostic,
+                ],
+            )
 
     def build_menu_names(self, obj):
         return (self.title, None)

@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> **Slashmad Fork Patch Block (updated 2026-02-17)**
+> **Slashmad Fork Patch Block (updated 2026-02-19)**
 >
 > Scope:
 > - This block documents **fork-specific changes** on branch `slashmad` in this `gramps` repo.
@@ -15,6 +15,16 @@
 > - **Safer copy-first flow**: button order and default response are tuned for copy-first behavior.
 > - **Swedish strings for new flows**: new media import/browse strings are translated in `po/sv.po` (with runtime fallback where needed).
 > - **Source/Citation autocomplete**: added focus-only, lazy-loaded autocomplete for source editor fields (`author`, `publication info`, `abbreviation`, `title`) and citation `volume/page`, based on existing stored values, with `Esc` to dismiss suggestions in the active field.
+>
+> Filter and relationship improvements:
+> - **New person source scope rules (person + linked events)**:
+>   - `People with <count> sources (person + linked events)`
+>   - `People with the <source> (person + linked events)`
+>   - `People missing sources (person + linked events)`
+> - **New relatedness rules with Home Person support**:
+>   - `People related to <Person/Home Person>`
+>   - `People NOT related to <Person/Home Person>`
+> - **Not Related diagnostics**: the `Not Related` tool now shows `Component` and `Diagnostic` columns to explain disconnections in the relationship graph.
 >
 > Build/version policy in this fork:
 > - Keep upstream app version as **`6.0.6`** (no local build identity suffix in runtime version string).

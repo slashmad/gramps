@@ -54,7 +54,9 @@ from ._hasnotetype import HasNoteType
 from ._hasothergender import HasOtherGender
 from ._hasrelationship import HasRelationship
 from ._hassourcecount import HasSourceCount
+from ._hassourcecountincludingevents import PersonHasSourceCountIncludingEvents
 from ._hassourceof import HasSourceOf
+from ._hassourceofincludingevents import PersonHasSourceOfIncludingEvents
 from ._hastag import HasTag
 from ._hastextmatchingregexpof import HasTextMatchingRegexpOf
 from ._hastextmatchingsubstringof import HasTextMatchingSubstringOf
@@ -100,6 +102,7 @@ from ._peopleprivate import PeoplePrivate
 from ._peoplepublic import PeoplePublic
 from ._personwithincompleteevent import PersonWithIncompleteEvent
 from ._probablyalive import ProbablyAlive
+from ._missingsourcesincludingevents import PersonMissingSourcesIncludingEvents
 from ._relationshippathbetween import RelationshipPathBetween
 from ._deeprelationshippathbetween import DeepRelationshipPathBetween
 from ._relationshippathbetweenbookmarks import RelationshipPathBetweenBookmarks
@@ -109,6 +112,10 @@ from ._matchidof import MatchIdOf
 from ._regexpidof import RegExpIdOf
 from ._changedsince import ChangedSince
 from ._isrelatedwith import IsRelatedWith
+from ._isrelatedwithpersonorhome import (
+    IsNotRelatedWithPersonOrHome,
+    IsRelatedWithPersonOrHome,
+)
 from ._hassoundexname import HasSoundexName
 
 # -------------------------------------------------------------------------
@@ -144,7 +151,10 @@ editor_rule_list = [
     HasFamilyAttribute,
     HasTag,
     HasSourceCount,
+    PersonHasSourceCountIncludingEvents,
     HasSourceOf,
+    PersonHasSourceOfIncludingEvents,
+    PersonMissingSourcesIncludingEvents,
     HaveAltFamilies,
     HavePhotos,
     HaveChildren,
@@ -194,5 +204,7 @@ editor_rule_list = [
     Disconnected,
     ChangedSince,
     IsRelatedWith,
+    IsRelatedWithPersonOrHome,
+    IsNotRelatedWithPersonOrHome,
     HasSoundexName,
 ]

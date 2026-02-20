@@ -50,6 +50,7 @@ from gramps.gui.display import display_help
 from gramps.gui.glade import Glade
 from gramps.gen.lib import Tag
 from gramps.gen.db import DbTxn
+from gramps.gen.config import config
 
 # -------------------------------------------------------------------------
 #
@@ -168,6 +169,12 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
         self.numberOfPeopleInDatabase = self.db.get_number_of_people()
         self.numberOfRelatedPeople = 0
         self.numberOfUnrelatedPeople = 0
+        self.include_associations = config.get(
+            "preferences.notrelated-include-associations"
+        )
+        self.association_reverse_index = (
+            self.build_association_reverse_index() if self.include_associations else {}
+        )
 
         # create the sets used to track related and unrelated people
         self.handlesOfPeopleToBeProcessed = set()
@@ -379,6 +386,39 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
                 if childRef and childRef.ref:
                     handles.add(childRef.ref)
 
+        if self.include_associations:
+            handles.update(self.get_association_neighbor_handles(person))
+
+        return handles
+
+    def build_association_reverse_index(self):
+        """
+        Build reverse association links (target handle -> source handles).
+        """
+        reverse_index = {}
+        for source_person in self.db.iter_people():
+            source_handle = source_person.get_handle()
+            for person_ref in source_person.get_person_ref_list():
+                if not person_ref:
+                    continue
+                target_handle = person_ref.get_reference_handle()
+                if not target_handle:
+                    continue
+                reverse_index.setdefault(target_handle, set()).add(source_handle)
+        return reverse_index
+
+    def get_association_neighbor_handles(self, person):
+        """
+        Return person handles connected through associations in either direction.
+        """
+        handles = set()
+        for person_ref in person.get_person_ref_list():
+            if not person_ref:
+                continue
+            associated_handle = person_ref.get_reference_handle()
+            if associated_handle:
+                handles.add(associated_handle)
+        handles.update(self.association_reverse_index.get(person.get_handle(), set()))
         return handles
 
     def get_component_handles(self, start_handle):
@@ -408,11 +448,21 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
         """
         Return a short diagnostic reason for why a person is disconnected.
         """
+        family_links = person.get_parent_family_handle_list() or person.get_family_handle_list()
+        assoc_links = (
+            self.get_association_neighbor_handles(person)
+            if self.include_associations
+            else set()
+        )
+
         if (
-            not person.get_parent_family_handle_list()
-            and not person.get_family_handle_list()
+            not family_links
+            and not assoc_links
         ):
             return _("Isolated person (no family links)")
+
+        if not family_links and assoc_links:
+            return _("Association-linked component")
 
         if component_size == 1:
             return _("Single-person component")

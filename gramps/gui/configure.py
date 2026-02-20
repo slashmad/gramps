@@ -1703,6 +1703,14 @@ class GrampsPreferences(ConfigureDialog):
         row += 1
         self.add_checkbox(
             grid,
+            _("Include associations in 'Not Related' tool"),
+            row,
+            "preferences.notrelated-include-associations",
+        )
+
+        row += 1
+        self.add_checkbox(
+            grid,
             _("Hide LDS tab in person and family editors"),
             row,
             "interface.hide-lds",

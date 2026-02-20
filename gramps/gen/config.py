@@ -331,6 +331,7 @@ register("preferences.use-last-view", False)
 register("preferences.last-view", "")
 register("preferences.last-views", [])
 register("preferences.family-relation-type", 3)  # UNKNOWN
+register("preferences.notrelated-include-associations", False)
 register("preferences.age-display-precision", 1)
 register("preferences.age-after-death", True)
 register("preferences.age-rounded-year", True)

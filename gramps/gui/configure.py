@@ -1703,6 +1703,14 @@ class GrampsPreferences(ConfigureDialog):
         row += 1
         self.add_checkbox(
             grid,
+            _("Treat partners as related in 'Not Related' tool"),
+            row,
+            "preferences.notrelated-include-partner-links",
+        )
+
+        row += 1
+        self.add_checkbox(
+            grid,
             _("Include associations in 'Not Related' tool"),
             row,
             "preferences.notrelated-include-associations",

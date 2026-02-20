@@ -26,6 +26,7 @@
 >   - `People related to <Person/Home Person>`
 >   - `People NOT related to <Person/Home Person>`
 > - **Not Related diagnostics**: the `Not Related` tool now shows `Component` and `Diagnostic` columns to explain disconnections in the relationship graph.
+> - **Partner-link toggle for Not Related**: new Data preference `Treat partners as related in 'Not Related' tool` controls whether partner-only links (through `Family`) count as related.
 > - **Association toggle for Not Related**: new Data preference `Include associations in 'Not Related' tool` lets you include personal associations (`PersonRef`) in connectivity checks when needed.
 >
 > Build/version policy in this fork:

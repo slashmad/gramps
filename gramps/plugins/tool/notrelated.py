@@ -169,6 +169,9 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
         self.numberOfPeopleInDatabase = self.db.get_number_of_people()
         self.numberOfRelatedPeople = 0
         self.numberOfUnrelatedPeople = 0
+        self.include_partner_links = config.get(
+            "preferences.notrelated-include-partner-links"
+        )
         self.include_associations = config.get(
             "preferences.notrelated-include-associations"
         )
@@ -362,9 +365,10 @@ class NotRelated(tool.ActivePersonTool, ManagedWindow):
             if not family:
                 continue
 
-            spouseHandle = utils.find_spouse(person, family)
-            if spouseHandle:
-                handles.add(spouseHandle)
+            if self.include_partner_links:
+                spouseHandle = utils.find_spouse(person, family)
+                if spouseHandle:
+                    handles.add(spouseHandle)
 
             for childRef in family.get_child_ref_list():
                 if childRef and childRef.ref:

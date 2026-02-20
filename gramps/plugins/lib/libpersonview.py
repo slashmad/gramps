@@ -30,6 +30,7 @@ Provide the base for a list person view.
 #
 # -------------------------------------------------------------------------
 from gi.repository import Gtk
+from gi.repository import Pango
 
 # -------------------------------------------------------------------------
 #
@@ -37,6 +38,7 @@ from gi.repository import Gtk
 #
 # -------------------------------------------------------------------------
 import logging
+import re
 
 _LOG = logging.getLogger(".gui.personview")
 
@@ -182,6 +184,104 @@ class BasePersonView(ListView):
         uistate.connect("placeformat-changed", self.build_tree)
 
         self.additional_uis.append(self.additional_ui)
+
+    @staticmethod
+    def _byte_offset(text, char_offset):
+        """
+        Convert character offset to UTF-8 byte offset used by Pango.
+        """
+        return len(text[:char_offset].encode("utf-8"))
+
+    @staticmethod
+    def _extract_call_name(raw_person_data):
+        """
+        Return call name from raw person data.
+        """
+        primary_name = getattr(raw_person_data, "primary_name", None)
+        if primary_name is None:
+            return ""
+        if isinstance(primary_name, dict):
+            return (primary_name.get("call") or "").strip()
+        call_name = getattr(primary_name, "call", "")
+        if not call_name and hasattr(primary_name, "get"):
+            try:
+                call_name = primary_name.get("call", "")
+            except Exception:
+                call_name = ""
+        return (call_name or "").strip()
+
+    @staticmethod
+    def _find_call_name_span(display_name, call_name):
+        """
+        Find call name span in display name.
+        """
+        if not display_name or not call_name:
+            return None
+        match = re.search(re.escape(call_name), display_name, flags=re.IGNORECASE)
+        return match.span() if match else None
+
+    def _call_name_cell_data_func(self, column, renderer, model, iter_, data=None):
+        """
+        Apply call-name styling (bold/underline) to person name list cells.
+        """
+        self.foreground_color(column, renderer, model, iter_, data)
+        renderer.set_property("attributes", None)
+
+        use_bold = config.get("preferences.callname-list-highlight-bold")
+        use_underline = config.get("preferences.callname-list-highlight-underline")
+        if not (use_bold or use_underline):
+            return
+
+        if not hasattr(model, "get_handle_from_iter") or not hasattr(model, "map"):
+            return
+        handle = model.get_handle_from_iter(iter_)
+        if not handle:
+            return
+
+        raw_person_data = model.map(handle)
+        if raw_person_data is None:
+            return
+        call_name = self._extract_call_name(raw_person_data)
+        if not call_name:
+            return
+
+        display_name = model.get_value(iter_, self.COL_NAME) or ""
+        span = self._find_call_name_span(display_name, call_name)
+        if not span:
+            return
+        start_char, end_char = span
+        start_index = self._byte_offset(display_name, start_char)
+        end_index = self._byte_offset(display_name, end_char)
+
+        attr_list = Pango.AttrList()
+        if use_bold:
+            bold_attr = Pango.attr_weight_new(Pango.Weight.BOLD)
+            bold_attr.start_index = start_index
+            bold_attr.end_index = end_index
+            attr_list.insert(bold_attr)
+        if use_underline:
+            underline_attr = Pango.attr_underline_new(Pango.Underline.SINGLE)
+            underline_attr.start_index = start_index
+            underline_attr.end_index = end_index
+            attr_list.insert(underline_attr)
+
+        renderer.set_property("attributes", attr_list)
+
+    def build_columns(self, preserve_col=True):
+        """
+        Build columns and attach call-name styling to the Name column.
+        """
+        view = ListView.build_columns(self, preserve_col=preserve_col)
+
+        visible_columns = [pair for pair in self.column_order() if pair[0]]
+        for visible_index, pair in enumerate(visible_columns):
+            if pair[1] == self.COL_NAME:
+                self.columns[visible_index].set_cell_data_func(
+                    self.renderer, self._call_name_cell_data_func
+                )
+                break
+
+        return view
 
     def navigation_type(self):
         """

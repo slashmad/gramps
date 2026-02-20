@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> **Slashmad Fork Patch Block (updated 2026-02-19)**
+> **Slashmad Fork Patch Block (updated 2026-02-20)**
 >
 > Scope:
 > - This block documents **fork-specific changes** on branch `slashmad` in this `gramps` repo.
@@ -15,6 +15,7 @@
 > - **Safer copy-first flow**: button order and default response are tuned for copy-first behavior.
 > - **Swedish strings for new flows**: new media import/browse strings are translated in `po/sv.po` (with runtime fallback where needed).
 > - **Source/Citation autocomplete**: added focus-only, lazy-loaded autocomplete for source editor fields (`author`, `publication info`, `abbreviation`, `title`) and citation `volume/page`, based on existing stored values, with `Esc` to dismiss suggestions in the active field.
+> - **Call-name highlighting in person lists**: new Text preferences allow highlighting names that have a call name with **bold**, **underline**, or both.
 >
 > Filter and relationship improvements:
 > - **New person source scope rules (person + linked events)**:

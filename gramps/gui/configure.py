@@ -1790,6 +1790,38 @@ class GrampsPreferences(ConfigureDialog):
             col_attach=1,
         )
         row += 1
+
+        label = self.add_text(
+            grid,
+            _("Call Name Highlighting in Person Lists"),
+            row,
+            line_wrap=True,
+            bold=True,
+            start=0,
+            stop=7,
+        )
+        label.set_margin_top(10)
+        row += 1
+
+        self.add_checkbox(
+            grid,
+            _("Highlight call name with bold"),
+            row,
+            "preferences.callname-list-highlight-bold",
+            start=1,
+            stop=7,
+        )
+        row += 1
+        self.add_checkbox(
+            grid,
+            _("Highlight call name with underline"),
+            row,
+            "preferences.callname-list-highlight-underline",
+            start=1,
+            stop=7,
+        )
+        row += 1
+
         return _("Text"), grid
 
     def cb_name_dialog(self, obj):
